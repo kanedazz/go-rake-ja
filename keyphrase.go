@@ -1,7 +1,6 @@
 package rakeja
 
 import (
-	"fmt"
 	"sort"
 )
 
@@ -97,9 +96,9 @@ func (kc *keyphraseCollection) sortByScoreInDesc() {
 }
 
 func (kc *keyphraseCollection) exportTopNPercent(topNPercent int) *keyphraseCollection {
-	fmt.Printf("len(kc.keyphrases): %d\n", len(kc.keyphrases))
+	debugf("len(kc.keyphrases): %d\n", len(kc.keyphrases))
 	for _, k := range kc.keyphrases {
-		fmt.Printf("keyphrase: %s, score: %f\n", k.GetText(), k.GetScore())
+		debugf("keyphrase: %s, score: %f\n", k.GetText(), k.GetScore())
 	}
 
 	if len(kc.keyphrases) == 0 {
@@ -115,7 +114,7 @@ func (kc *keyphraseCollection) exportTopNPercent(topNPercent int) *keyphraseColl
 	}
 
 	n := len(kc.keyphrases) * topNPercent / 100
-	fmt.Printf("n: %d\n", n)
+	debugf("n: %d\n", n)
 
 	return &keyphraseCollection{keyphrases: kc.keyphrases[:n]}
 }

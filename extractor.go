@@ -1,7 +1,5 @@
 package rakeja
 
-import "fmt"
-
 const defaultTopNPercent = 33
 
 type IExtractor interface {
@@ -10,6 +8,7 @@ type IExtractor interface {
 }
 
 type extractor struct {
+	pos4ContentWords []string
 	phraseDelimiters []string
 	stopWords        []string
 	wordScoring      WordScoring
@@ -28,7 +27,7 @@ func (e *extractor) Extract(text *string) (IKeyphraseCollection, error) {
 		return nil, err
 	}
 
-	fmt.Printf("words: %v\n", words)
+	debugf("words: %v\n", words)
 
 	/*
 		- キーフレーズの候補を作成する
@@ -37,50 +36,69 @@ func (e *extractor) Extract(text *string) (IKeyphraseCollection, error) {
 	candidateCollection := &keyphraseCollection{}
 	candidate := keyphrase{}
 	for i, word := range words {
+		// 内容語として扱わない品詞の場合の処理
+		isContentWordPos := false
+		for _, pos := range e.pos4ContentWords {
+			if pos == word.pos {
+				isContentWordPos = true
+				break
+			}
+		}
+		if !isContentWordPos {
+			debugf("not content word: %s ; pos: %s\n", word.txt, word.pos)
+
+			if !candidate.isEmpty() {
+				candidate.incrementDeg()
+				candidateCollection.appendIfUnq(candidate)
+				candidate = keyphrase{}
+			}
+			continue
+		}
+
 		// ストップワードの場合の処理
 		isStopWord := false
 		for _, sw := range e.stopWords {
-			if sw == word {
-				fmt.Printf("stop word: %s ; candidate: %s(%+v)\n", word, candidate.GetText(), candidate)
-				if !candidate.isEmpty() {
-					candidate.incrementDeg()
-					candidateCollection.appendIfUnq(candidate)
-					candidate = keyphrase{}
-				}
+			if sw == word.txt {
+				debugf("stop word: %s ; candidate: %s(%+v)\n", word, candidate.GetText(), candidate)
 				isStopWord = true
 				break
 			}
 		}
 		if isStopWord {
+			if !candidate.isEmpty() {
+				candidate.incrementDeg()
+				candidateCollection.appendIfUnq(candidate)
+				candidate = keyphrase{}
+			}
 			continue
 		}
 
 		// 区切り文字の場合の処理
 		isPhraseDelimiter := false
 		for _, pd := range e.phraseDelimiters {
-			if pd == word {
-				fmt.Printf("phrase delimiter: %s ; candidate: %s(%+v)\n", word, candidate.GetText(), candidate)
-				if !candidate.isEmpty() {
-					candidate.incrementDeg()
-					candidateCollection.appendIfUnq(candidate)
-					candidate = keyphrase{}
-				}
+			if pd == word.txt {
+				debugf("phrase delimiter: %s ; candidate: %s(%+v)\n", word, candidate.GetText(), candidate)
 				isPhraseDelimiter = true
 				break
 			}
 		}
 		if isPhraseDelimiter {
+			if !candidate.isEmpty() {
+				candidate.incrementDeg()
+				candidateCollection.appendIfUnq(candidate)
+				candidate = keyphrase{}
+			}
 			continue
 		}
 
-		w := wm.getWord(word)
+		w := wm.getWord(word.txt)
 		w.freq++
 
 		candidate.append(w)
 
 		// 最後の単語の場合の処理
 		if i == len(words)-1 {
-			fmt.Printf("last word: %s ; candidate: %s(%+v)\n", word, candidate.GetText(), candidate)
+			debugf("last word: %s ; candidate: %s(%+v)\n", word, candidate.GetText(), candidate)
 			if !candidate.isEmpty() {
 				candidate.incrementDeg()
 				candidateCollection.appendIfUnq(candidate)
@@ -104,7 +122,7 @@ func (e *extractor) Extract(text *string) (IKeyphraseCollection, error) {
 	candidateCollection.sortByScoreInDesc()
 	// print
 	for _, k := range candidateCollection.List() {
-		fmt.Printf("keyphrase: %s, score: %f\n", k.GetText(), k.GetScore())
+		debugf("keyphrase: %s, score: %f\n", k.GetText(), k.GetScore())
 	}
 
 	/*
@@ -113,7 +131,7 @@ func (e *extractor) Extract(text *string) (IKeyphraseCollection, error) {
 	collection := candidateCollection.exportTopNPercent(e.topNPercent)
 	// print
 	for _, k := range collection.List() {
-		fmt.Printf("keyphrase: %s, score: %f\n", k.GetText(), k.GetScore())
+		debugf("keyphrase: %s, score: %f\n", k.GetText(), k.GetScore())
 	}
 
 	return collection, nil
@@ -121,6 +139,7 @@ func (e *extractor) Extract(text *string) (IKeyphraseCollection, error) {
 
 func NewDefaultExtractor() IExtractor {
 	return &extractor{
+		pos4ContentWords: defaultPos4ContentWords,
 		phraseDelimiters: defaultPhraseDelimiters,
 		stopWords:        defaultStopWords,
 		wordScoring:      WordScoringDegToFreq,
@@ -129,6 +148,8 @@ func NewDefaultExtractor() IExtractor {
 }
 
 type NewExtractorParams struct {
+	// 指定された場合、このスライスに含まれる品詞のみを内容語として扱う。
+	Pos4ContentWords []string
 	PhraseDelimiters []string
 	StopWords        []string
 	WordScoring      *WordScoring
@@ -137,6 +158,12 @@ type NewExtractorParams struct {
 
 func NewExtractor(params NewExtractorParams) IExtractor {
 	e := &extractor{}
+
+	if params.Pos4ContentWords == nil {
+		e.pos4ContentWords = defaultPos4ContentWords
+	} else {
+		e.pos4ContentWords = params.Pos4ContentWords
+	}
 
 	if params.PhraseDelimiters == nil {
 		e.phraseDelimiters = defaultPhraseDelimiters

@@ -1,5 +1,11 @@
 package rakeja
 
+var defaultPos4ContentWords = []string{
+	Noun,
+	Verb,
+	Adjective,
+}
+
 var defaultStopWords = []string{
 	"あの", "あれら", "ある", "い", "いる", "および",
 	"か", "が", "かつ", "かも", "から", "こと", "この", "これ", "これら",

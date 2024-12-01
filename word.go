@@ -1,6 +1,7 @@
 package rakeja
 
 type word struct {
+	// テキスト
 	text string
 	// 当該ワードの出現回数
 	freq int
